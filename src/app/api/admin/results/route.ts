@@ -7,6 +7,7 @@ export async function GET() {
     const { data: attempts, error } = await supabase
       .from("quiz_attempts")
       .select("id, student_id, quiz_id, score, total_marks, percentage, status, submitted_at")
+      .eq("status", "submitted")
       .order("submitted_at", { ascending: false });
     if (error) throw error;
 
@@ -14,7 +15,7 @@ export async function GET() {
     const quizIds = [...new Set(attempts.map((attempt) => attempt.quiz_id))];
     const [{ data: students, error: studentsError }, { data: quizzes, error: quizzesError }] =
       await Promise.all([
-        supabase.from("students").select("id, full_name, email, groups(name)").in("id", studentIds),
+        supabase.from("students").select("id, full_name, email, group_id, groups(name)").in("id", studentIds),
         supabase.from("quizzes").select("id, title").in("id", quizIds),
       ]);
     if (studentsError) throw studentsError;
