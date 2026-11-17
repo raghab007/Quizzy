@@ -20,19 +20,25 @@ export async function POST(request: Request) {
 
     const answers = body.answers as SubmittedAnswer[];
     const supabase = createServiceClient();
-    const { data: quiz, error: quizError } = await supabase
-      .from("quizzes")
-      .select("id, show_answers_after_submission")
-      .eq("id", body.quizId)
-      .eq("is_published", true)
-      .single();
+    // These lookups do not depend on each other, so run them together instead
+    // of making students wait for two separate database round trips.
+    const [quizResult, attemptResult] = await Promise.all([
+      supabase
+        .from("quizzes")
+        .select("id, show_answers_after_submission")
+        .eq("id", body.quizId)
+        .eq("is_published", true)
+        .single(),
+      supabase
+        .from("quiz_attempts")
+        .select("id, quiz_id, status")
+        .eq("id", body.attemptId)
+        .eq("quiz_id", body.quizId)
+        .single(),
+    ]);
+    const { data: quiz, error: quizError } = quizResult;
     if (quizError) throw quizError;
-    const { data: attempt, error: attemptError } = await supabase
-      .from("quiz_attempts")
-      .select("id, quiz_id, status")
-      .eq("id", body.attemptId)
-      .eq("quiz_id", quiz.id)
-      .single();
+    const { data: attempt, error: attemptError } = attemptResult;
     if (attemptError) throw attemptError;
     if (attempt.status !== "in_progress") {
       return NextResponse.json({ error: "This attempt has already been submitted." }, { status: 409 });
@@ -40,8 +46,9 @@ export async function POST(request: Request) {
 
     const { data: quizQuestions, error: quizQuestionsError } = await supabase
       .from("quiz_questions")
-      .select("question_id, marks")
-      .eq("quiz_id", quiz.id);
+      .select("question_id, marks, questions!inner(id, question_text, explanation, question_options(id, option_text, is_correct))")
+      .eq("quiz_id", quiz.id)
+      .order("display_order", { ascending: true });
     if (quizQuestionsError) throw quizQuestionsError;
 
     const questionIds = quizQuestions.map(({ question_id }) => question_id);
@@ -58,15 +65,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: questions, error: questionsError } = await supabase
-      .from("questions")
-      .select("id, question_text, explanation, question_options(id, option_text, is_correct)")
-      .in("id", questionIds);
-    if (questionsError) throw questionsError;
+    const questionById = new Map(
+      quizQuestions.map((quizQuestion) => [quizQuestion.question_id, quizQuestion.questions]),
+    );
+    const marksByQuestion = new Map(
+      quizQuestions.map(({ question_id, marks }) => [question_id, Number(marks)]),
+    );
 
     let obtainedMarks = 0;
     let correctAnswers = 0;
-    const results = questions.map((question) => {
+    const results = questionIds.map((questionId) => {
+      const question = questionById.get(questionId);
+      if (!question) throw new Error("A quiz question could not be loaded.");
       const selectedOptionId = submittedByQuestion.get(question.id)!;
       const selectedOption = question.question_options.find(
         (option) => option.id === selectedOptionId,
@@ -76,7 +86,7 @@ export async function POST(request: Request) {
       }
       const correctOption = question.question_options.find((option) => option.is_correct);
       const isCorrect = Boolean(selectedOption.is_correct);
-      const marks = quizQuestions.find(({ question_id }) => question_id === question.id)?.marks ?? 0;
+      const marks = marksByQuestion.get(question.id) ?? 0;
       if (isCorrect) {
         obtainedMarks += marks;
         correctAnswers += 1;
@@ -97,9 +107,7 @@ export async function POST(request: Request) {
       question_id: answer.question_id,
       selected_option_id: submittedByQuestion.get(answer.question_id),
       is_correct: answer.is_correct,
-      marks_obtained: answer.is_correct
-        ? quizQuestions.find(({ question_id }) => question_id === answer.question_id)?.marks ?? 0
-        : 0,
+      marks_obtained: answer.is_correct ? marksByQuestion.get(answer.question_id) ?? 0 : 0,
     }));
     const { error: answersError } = await supabase.from("student_answers").insert(answerRows);
     if (answersError) throw answersError;

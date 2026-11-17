@@ -2,8 +2,8 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f7f8fc] px-6 text-slate-900">
-      <header className="mx-auto flex max-w-6xl items-center justify-between py-6">
+    <main className="min-h-screen overflow-hidden bg-[#f7f8fc] px-4 text-slate-900 sm:px-6">
+      <header className="mx-auto flex max-w-6xl items-center justify-between py-4 sm:py-6">
         <Link href="/" className="flex items-center gap-3 text-xl font-bold tracking-tight"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#635bdb] text-white shadow-lg shadow-violet-200">Q</span>quizzy<span className="-ml-3 text-[#635bdb]">.</span></Link>
         <Link href="/admin/login" className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:text-violet-700">Admin sign in <span aria-hidden="true">↗</span></Link>
       </header>
@@ -20,11 +20,11 @@ export default function Home() {
             Start your assessment <span aria-hidden="true" className="ml-2">→</span>
           </Link>
         </div>
-        <div className="mt-12 flex items-center gap-8 border-t border-slate-200 pt-6 text-sm text-slate-500"><div><strong className="block text-xl text-slate-800">Focused</strong>distraction-free testing</div><div><strong className="block text-xl text-slate-800">Clear</strong>instant feedback</div><div><strong className="block text-xl text-slate-800">Insightful</strong>performance reports</div></div>
+        <div className="mt-12 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-slate-200 pt-6 text-xs text-slate-500 sm:grid-cols-3 sm:gap-8 sm:text-sm"><div><strong className="block text-lg text-slate-800 sm:text-xl">Focused</strong>distraction-free testing</div><div><strong className="block text-lg text-slate-800 sm:text-xl">Clear</strong>instant feedback</div><div className="col-span-2 sm:col-span-1"><strong className="block text-lg text-slate-800 sm:text-xl">Insightful</strong>performance reports</div></div>
         </div>
         <div className="relative mx-auto w-full max-w-[480px] py-10">
           <div className="absolute -inset-10 rounded-full bg-violet-100/70 blur-3xl" />
-          <div className="relative rotate-1 rounded-[26px] border border-white bg-white p-6 shadow-[0_25px_90px_-35px_rgba(65,61,145,.32)] sm:p-8">
+          <div className="relative rotate-0 rounded-[26px] border border-white bg-white p-5 shadow-[0_25px_90px_-35px_rgba(65,61,145,.32)] sm:rotate-1 sm:p-8">
             <div className="flex items-center justify-between"><div><span className="text-xs font-bold uppercase tracking-widest text-violet-600">Quick preview</span><h2 className="mt-2 text-xl font-bold">Java fundamentals</h2></div><span className="rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700">12 min</span></div>
             <div className="mt-7 flex items-center justify-between text-xs font-medium text-slate-400"><span>QUESTION 03 OF 12</span><span>25%</span></div><div className="mt-2 h-1.5 rounded-full bg-slate-100"><div className="h-full w-1/4 rounded-full bg-[#7168e5]" /></div>
             <p className="mt-7 text-lg font-semibold leading-7 text-slate-800">Which keyword is used to inherit a class in Java?</p>

@@ -61,13 +61,34 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .admin-content button:hover { filter: brightness(.97); }
 .admin-content button:active { transform: translateY(1px); }
 
+@keyframes quiz-question-from-right {
+  from { opacity: 0; transform: translate3d(18px, 5px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes quiz-question-from-left {
+  from { opacity: 0; transform: translate3d(-18px, 5px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.quiz-question-panel--next { animation: quiz-question-from-right 280ms cubic-bezier(.2,.75,.25,1) both; }
+.quiz-question-panel--previous { animation: quiz-question-from-left 280ms cubic-bezier(.2,.75,.25,1) both; }
+.quiz-answer-option { transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.quiz-answer-option:active { transform: scale(.995); }
+.quiz-answer-option--selected { animation: quiz-answer-select 220ms ease-out both; }
+@keyframes quiz-answer-select {
+  from { box-shadow: 0 0 0 0 rgb(6 182 212 / 0%); }
+  to { box-shadow: 0 0 0 3px rgb(6 182 212 / 10%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
 @media (max-width: 760px) {
   .admin-sidebar { position: static; width: 100%; height: auto; padding: 13px 15px 9px; border-right: 0; border-bottom: 1px solid #e9ebf2; }
   .admin-brand { font-size: 18px; }
   .admin-brand-mark { width: 34px; height: 34px; border-radius: 11px; }
   .admin-nav-label,.admin-sidebar-bottom { display: none; }
   .admin-nav { display: flex; gap: 3px; overflow-x: auto; margin-top: 12px; }
-  .admin-nav-link { min-height: 38px; flex: none; gap: 7px; padding: 0 10px; font-size: 11px; }
+  .admin-nav-link { min-height: 42px; flex: none; gap: 7px; padding: 0 10px; font-size: 11px; }
   .admin-nav-icon { font-size: 15px; }
   .admin-nav-indicator { right: 8px; bottom: 2px; left: 8px; height: 2px; width: auto; border-radius: 3px; }
   .admin-main-column { margin-left: 0; }
@@ -76,4 +97,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .admin-content main { padding-top: 4px; }
   .admin-topbar-user { font-size: 0; }
   .admin-avatar { font-size: 12px; }
+  .admin-content input:not([type=checkbox]):not([type=radio]),.admin-content textarea,.admin-content select { min-height: 44px; }
+  .admin-content button { min-height: 42px; }
+}
+
+@media (max-width: 380px) {
+  .admin-sidebar { padding-right: 10px; padding-left: 10px; }
+  .admin-nav-link { padding-right: 8px; padding-left: 8px; }
+  .admin-content { padding-right: 13px; padding-left: 13px; }
+  .admin-topbar { padding-right: 14px; padding-left: 14px; }
 }

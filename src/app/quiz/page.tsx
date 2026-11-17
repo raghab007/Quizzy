@@ -35,9 +35,38 @@ type Result = {
   }[];
 };
 
+function playQuizSound(kind: "next" | "complete") {
+  if (typeof window === "undefined" || !window.AudioContext) return;
+
+  try {
+    const context = new AudioContext();
+    const notes = kind === "complete" ? [523.25, 659.25, 783.99] : [659.25];
+    const now = context.currentTime;
+
+    notes.forEach((frequency, index) => {
+      const start = now + index * 0.12;
+      const oscillator = context.createOscillator();
+      const volume = context.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, start);
+      volume.gain.setValueAtTime(0.0001, start);
+      volume.gain.exponentialRampToValueAtTime(0.12, start + 0.025);
+      volume.gain.exponentialRampToValueAtTime(0.0001, start + 0.2);
+      oscillator.connect(volume);
+      volume.connect(context.destination);
+      oscillator.start(start);
+      oscillator.stop(start + 0.21);
+    });
+
+    window.setTimeout(() => void context.close(), kind === "complete" ? 650 : 300);
+  } catch {
+    // Audio is optional; quiz navigation should work if the browser blocks it.
+  }
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
+    <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 sm:py-10">
       <div className="mx-auto max-w-3xl">{children}</div>
     </main>
   );
@@ -52,6 +81,10 @@ export default function QuizPage() {
   const [result, setResult] = useState<Result | null>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [registering, setRegistering] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [navigationNotice, setNavigationNotice] = useState<string | null>(null);
+  const [questionDirection, setQuestionDirection] = useState<"next" | "previous">("next");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,7 +106,7 @@ export default function QuizPage() {
   if (error) {
     return (
       <Shell>
-        <section className="rounded-2xl border border-red-200 bg-white p-8 text-center shadow-sm">
+        <section className="rounded-2xl border border-red-200 bg-white p-5 text-center shadow-sm sm:p-8">
           <h1 className="text-2xl font-semibold text-slate-950">Quiz unavailable</h1>
           <p className="mt-3 text-red-600">{error}</p>
         </section>
@@ -90,7 +123,7 @@ export default function QuizPage() {
     return (
       <Shell>
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="bg-slate-950 px-8 py-10 text-white">
+          <div className="bg-slate-950 px-5 py-7 text-white sm:px-8 sm:py-10">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">Assessment complete</p>
             <div className="mt-3 flex flex-wrap items-end justify-between gap-6">
               <div>
@@ -103,8 +136,8 @@ export default function QuizPage() {
               </div>
             </div>
           </div>
-          <div className="p-8">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="p-5 sm:p-8">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
                 <p className="text-sm font-medium text-emerald-700">Right answers</p>
                 <p className="mt-2 text-3xl font-bold text-emerald-900">{result.correct_answers}</p>
@@ -179,7 +212,7 @@ export default function QuizPage() {
   if (stage === "register") {
     return (
       <Shell>
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
             Student registration
           </p>
@@ -255,7 +288,7 @@ export default function QuizPage() {
   if (stage === "instructions") {
     return (
       <Shell>
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
             Quiz instructions
           </p>
@@ -268,7 +301,7 @@ export default function QuizPage() {
           </div>
           <ul className="mt-7 list-disc space-y-2 pl-5 text-slate-600">
             <li>Read each question carefully and select one answer.</li>
-            <li>You can move between questions before submitting.</li>
+            <li>Select an answer before moving to the next question. You can revisit earlier questions before submitting.</li>
             <li>Your quiz will be submitted automatically when the timer expires.</li>
           </ul>
           <button
@@ -285,65 +318,93 @@ export default function QuizPage() {
   const question = data.questions[current];
   return (
     <Shell>
-      <header className="rounded-2xl bg-slate-950 p-7 text-white">
+      <header className="rounded-2xl bg-slate-950 p-5 text-white sm:p-7">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">Java assessment</p>
         <h1 className="mt-3 text-3xl font-semibold">{data.quiz.title}</h1>
         <p className="mt-4 text-sm text-slate-400">{data.questions.length} questions · {data.quiz.duration_minutes} minutes</p>
       </header>
-      <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+      <section key={question.id} className={`quiz-question-panel quiz-question-panel--${questionDirection} mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7`}>
         <div className="flex items-center justify-between text-sm text-slate-500">
           <span>Question {current + 1} of {data.questions.length}</span>
           <span>{question.marks} mark{question.marks === 1 ? "" : "s"}</span>
         </div>
         <div className="mt-3 h-2 rounded-full bg-slate-100">
-          <div className="h-2 rounded-full bg-cyan-500" style={{ width: `${((current + 1) / data.questions.length) * 100}%` }} />
+          <div className="h-2 rounded-full bg-cyan-500 transition-[width] duration-500 ease-out" style={{ width: `${((current + 1) / data.questions.length) * 100}%` }} />
         </div>
         <h2 className="mt-8 text-xl font-semibold leading-8 text-slate-950">{question.question_text}</h2>
         {question.code_snippet && <pre className="mt-5 overflow-x-auto rounded-lg bg-slate-950 p-4 text-sm text-cyan-100"><code>{question.code_snippet}</code></pre>}
         <div className="mt-6 space-y-3">
           {question.question_options.map((option) => (
-            <label key={option.id} className="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-4 text-slate-700 hover:border-cyan-400 hover:bg-cyan-50">
+            <label key={option.id} className={`quiz-answer-option flex cursor-pointer gap-3 rounded-lg border p-4 text-slate-700 ${answers[question.id] === option.id ? "quiz-answer-option--selected border-cyan-400 bg-cyan-50 ring-2 ring-cyan-100" : "border-slate-200 hover:border-cyan-300 hover:bg-cyan-50/60"}`}>
               <input
                 type="radio"
                 name={question.id}
                 value={option.id}
                 checked={answers[question.id] === option.id}
-                onChange={() => setAnswers((currentAnswers) => ({ ...currentAnswers, [question.id]: option.id }))}
+                onChange={() => {
+                  setAnswers((currentAnswers) => ({ ...currentAnswers, [question.id]: option.id }));
+                  setNavigationNotice(null);
+                }}
               />
               <span>{option.option_text}</span>
             </label>
           ))}
         </div>
+        {navigationNotice && <p role="status" className="mt-4 text-sm font-medium text-amber-700">{navigationNotice}</p>}
+        {!answers[question.id] && current < data.questions.length - 1 && !navigationNotice && <p className="mt-4 text-sm text-slate-500">Choose an answer to continue.</p>}
         <div className="mt-8 flex justify-between">
-          <button disabled={current === 0} onClick={() => setCurrent((value) => value - 1)} className="rounded-lg border border-slate-300 px-5 py-2.5 font-semibold text-slate-700 disabled:opacity-40">Previous</button>
+          <button disabled={current === 0} onClick={() => { setQuestionDirection("previous"); setCurrent((value) => value - 1); }} className="rounded-lg border border-slate-300 px-5 py-2.5 font-semibold text-slate-700 transition disabled:opacity-40">Previous</button>
           {current === data.questions.length - 1 ? (
             <button
-              disabled={Object.keys(answers).length !== data.questions.length}
+              disabled={submitting || Object.keys(answers).length !== data.questions.length}
               onClick={async () => {
-                const response = await fetch("/api/quiz/submit", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    quizId: data.quiz.id,
-                    attemptId,
-                    answers: Object.entries(answers).map(([questionId, optionId]) => ({ questionId, optionId })),
-                  }),
-                });
-                const body = await response.json();
-                if (!response.ok) {
-                  setError(body.error);
-                  return;
+                setSubmitting(true);
+                setSubmitError(null);
+                try {
+                  const response = await fetch("/api/quiz/submit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      quizId: data.quiz.id,
+                      attemptId,
+                      answers: Object.entries(answers).map(([questionId, optionId]) => ({ questionId, optionId })),
+                    }),
+                  });
+                  const body = await response.json();
+                  if (!response.ok) {
+                    setSubmitError(body.error ?? "Unable to submit the quiz. Please try again.");
+                    setSubmitting(false);
+                    return;
+                  }
+                  playQuizSound("complete");
+                  setResult(body as Result);
+                } catch {
+                  setSubmitError("Connection problem. Check your internet and try submitting again.");
+                  setSubmitting(false);
                 }
-                setResult(body as Result);
               }}
               className="rounded-lg bg-green-700 px-5 py-2.5 font-semibold text-white disabled:opacity-40"
             >
-              Submit quiz
+              {submitting ? "Submitting..." : "Submit quiz"}
             </button>
           ) : (
-            <button onClick={() => setCurrent((value) => value + 1)} className="rounded-lg bg-slate-950 px-5 py-2.5 font-semibold text-white">Next</button>
+            <button
+              disabled={!answers[question.id]}
+              onClick={() => {
+                if (!answers[question.id]) {
+                  setNavigationNotice("Select an answer before moving to the next question.");
+                  return;
+                }
+                playQuizSound("next");
+                setNavigationNotice(null);
+                setQuestionDirection("next");
+                setCurrent((value) => value + 1);
+              }}
+              className="rounded-lg bg-slate-950 px-5 py-2.5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >Next</button>
           )}
         </div>
+        {submitError && <p role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{submitError}</p>}
       </section>
     </Shell>
   );
