@@ -66,7 +66,10 @@ export async function POST(request: Request) {
     }
 
     const questionById = new Map(
-      quizQuestions.map((quizQuestion) => [quizQuestion.question_id, quizQuestion.questions]),
+      quizQuestions.map((quizQuestion) => [
+        quizQuestion.question_id,
+        quizQuestion.questions[0],
+      ]),
     );
     const marksByQuestion = new Map(
       quizQuestions.map(({ question_id, marks }) => [question_id, Number(marks)]),

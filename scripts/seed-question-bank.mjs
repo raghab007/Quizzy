@@ -200,6 +200,9 @@ const questions = [
     topic: "Type Casting",
     difficulty: "easy",
     question: "Which statement explicitly converts an int to a char?",
+    code_snippet: `int number = 66;
+char letter = (char) number;
+System.out.println(letter);`,
     explanation: "A narrowing conversion from int to char requires the explicit (char) cast.",
     options: [
       ["char letter = (char) number;", true],
@@ -212,6 +215,9 @@ const questions = [
     topic: "Type Casting",
     difficulty: "medium",
     question: "What happens when a char is assigned to an int in Java?",
+    code_snippet: `char grade = 'A';
+int code = grade;
+System.out.println(code);`,
     explanation: "char can be widened to int automatically, preserving its numeric Unicode value.",
     options: [
       ["It causes a compilation error", false],
@@ -224,6 +230,8 @@ const questions = [
     topic: "Type Casting",
     difficulty: "medium",
     question: "What is the value of int code = 'A';?",
+    code_snippet: `int code = 'A';
+System.out.println(code);`,
     explanation: "The Unicode value of uppercase A is 65, so assigning it to int produces 65.",
     options: [
       ["1", false],
@@ -236,6 +244,9 @@ const questions = [
     topic: "Type Casting",
     difficulty: "medium",
     question: "What character does char letter = (char) 66; store?",
+    code_snippet: `int value = 66;
+char letter = (char) value;
+System.out.println(letter);`,
     explanation: "The Unicode value 66 represents the uppercase character B.",
     options: [
       ["A", false],
@@ -380,7 +391,7 @@ for (const oldGroup of oldGroups) {
 
 let insertedCount = 0;
 let skippedCount = 0;
-const questionIds = [];
+const questionIdsByText = new Map();
 
 for (const item of questions) {
   const { data: existing, error: existingError } = await supabase
@@ -391,7 +402,18 @@ for (const item of questions) {
 
   if (existingError) throw existingError;
   if (existing) {
-    questionIds.push(existing.id);
+    questionIdsByText.set(item.question, existing.id);
+    const { error: updateError } = await supabase
+      .from("questions")
+      .update({
+        topic_id: topicIds.get(item.topic),
+        difficulty: item.difficulty,
+        marks: 1,
+        explanation: item.explanation,
+        code_snippet: item.code_snippet ?? null,
+      })
+      .eq("id", existing.id);
+    if (updateError) throw updateError;
     skippedCount += 1;
     continue;
   }
@@ -401,6 +423,7 @@ for (const item of questions) {
     .insert({
       topic_id: topicIds.get(item.topic),
       question_text: item.question,
+      code_snippet: item.code_snippet ?? null,
       difficulty: item.difficulty,
       question_type: "multiple_choice",
       marks: 1,
@@ -421,7 +444,7 @@ for (const item of questions) {
   );
 
   if (optionsError) throw optionsError;
-  questionIds.push(question.id);
+  questionIdsByText.set(item.question, question.id);
   insertedCount += 1;
 }
 
@@ -445,7 +468,7 @@ if (!quizId) {
       passing_marks: 10,
       is_published: true,
       allow_retake: false,
-      show_answers_after_submission: false,
+      show_answers_after_submission: true,
     })
     .select("id")
     .single();
@@ -463,30 +486,62 @@ else {
 
 const { data: existingQuizQuestions, error: quizQuestionsError } = await supabase
   .from("quiz_questions")
-  .select("question_id, display_order")
+  .select("id, question_id, display_order")
   .eq("quiz_id", quizId);
 
 if (quizQuestionsError) throw quizQuestionsError;
 
-const linkedQuestionIds = new Set(
-  existingQuizQuestions.map(({ question_id }) => question_id),
-);
-const nextDisplayOrder =
-  Math.max(0, ...existingQuizQuestions.map(({ display_order }) => display_order)) + 1;
-const missingQuizQuestions = questionIds
-  .map((questionId, index) => ({
-    quiz_id: quizId,
-    question_id: questionId,
-    display_order: nextDisplayOrder + index,
-    marks: 1,
-  }))
-  .filter(({ question_id }) => !linkedQuestionIds.has(question_id));
+const initialItems = [
+  ...questions.filter((item) => item.topic === "Introduction to Java").slice(0, 3),
+  ...questions.filter((item) => item.topic === "JDK, JRE, and JVM"),
+  ...questions.filter((item) => item.topic === "Variables and Data Types"),
+  ...questions.filter((item) => item.topic === "Type Casting").slice(0, 5),
+  ...questions.filter((item) => item.topic === "Format Specifiers and Escape Sequences").slice(0, 2),
+  ...questions.filter((item) => item.topic === "Scanner Class").slice(0, 2),
+];
+const initialQuestionIds = initialItems.map((item) => questionIdsByText.get(item.question));
+const selectedQuestionIds = new Set(initialQuestionIds);
 
-if (missingQuizQuestions.length > 0) {
-  const { error: linkError } = await supabase
-    .from("quiz_questions")
-    .insert(missingQuizQuestions);
-  if (linkError) throw linkError;
+for (const existingQuestion of existingQuizQuestions) {
+  if (!selectedQuestionIds.has(existingQuestion.question_id)) {
+    const { error: deleteLinkError } = await supabase
+      .from("quiz_questions")
+      .delete()
+      .eq("id", existingQuestion.id);
+    if (deleteLinkError) throw deleteLinkError;
+  }
+}
+
+for (const [index, existingQuestion] of existingQuizQuestions.entries()) {
+  if (selectedQuestionIds.has(existingQuestion.question_id)) {
+    const { error: temporaryOrderError } = await supabase
+      .from("quiz_questions")
+      .update({ display_order: 1000 + index })
+      .eq("id", existingQuestion.id);
+    if (temporaryOrderError) throw temporaryOrderError;
+  }
+}
+
+for (const [index, questionId] of initialQuestionIds.entries()) {
+  if (!questionId) continue;
+  const existingQuestion = existingQuizQuestions.find(
+    (item) => item.question_id === questionId,
+  );
+  if (existingQuestion) {
+    const { error: orderError } = await supabase
+      .from("quiz_questions")
+      .update({ display_order: index + 1, marks: 1 })
+      .eq("id", existingQuestion.id);
+    if (orderError) throw orderError;
+  } else {
+    const { error: linkError } = await supabase.from("quiz_questions").insert({
+      quiz_id: quizId,
+      question_id: questionId,
+      display_order: index + 1,
+      marks: 1,
+    });
+    if (linkError) throw linkError;
+  }
 }
 
 console.log(`Question bank seeded: ${insertedCount} inserted, ${skippedCount} skipped.`);
