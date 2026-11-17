@@ -46,12 +46,18 @@ export async function POST(request: Request) {
 
     const { data: quizQuestions, error: quizQuestionsError } = await supabase
       .from("quiz_questions")
-      .select("question_id, marks, questions!inner(id, question_text, explanation, question_options(id, option_text, is_correct))")
+      .select("question_id, marks")
       .eq("quiz_id", quiz.id)
       .order("display_order", { ascending: true });
     if (quizQuestionsError) throw quizQuestionsError;
 
     const questionIds = quizQuestions.map(({ question_id }) => question_id);
+    const { data: questions, error: questionsError } = await supabase
+      .from("questions")
+      .select("id, question_text, explanation, question_options(id, option_text, is_correct)")
+      .in("id", questionIds);
+    if (questionsError) throw questionsError;
+
     const submittedByQuestion = new Map(
       answers.map(({ questionId, optionId }) => [questionId, optionId]),
     );
@@ -66,10 +72,7 @@ export async function POST(request: Request) {
     }
 
     const questionById = new Map(
-      quizQuestions.map((quizQuestion) => [
-        quizQuestion.question_id,
-        quizQuestion.questions[0],
-      ]),
+      questions.map((question) => [question.id, question]),
     );
     const marksByQuestion = new Map(
       quizQuestions.map(({ question_id, marks }) => [question_id, Number(marks)]),
