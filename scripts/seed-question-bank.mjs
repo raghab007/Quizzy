@@ -197,6 +197,54 @@ const questions = [
     ],
   },
   {
+    topic: "Type Casting",
+    difficulty: "easy",
+    question: "Which statement explicitly converts an int to a char?",
+    explanation: "A narrowing conversion from int to char requires the explicit (char) cast.",
+    options: [
+      ["char letter = (char) number;", true],
+      ["char letter = char(number);", false],
+      ["char letter = number.toChar();", false],
+      ["char letter = number;", false],
+    ],
+  },
+  {
+    topic: "Type Casting",
+    difficulty: "medium",
+    question: "What happens when a char is assigned to an int in Java?",
+    explanation: "char can be widened to int automatically, preserving its numeric Unicode value.",
+    options: [
+      ["It causes a compilation error", false],
+      ["It is converted to its numeric Unicode value", true],
+      ["It is converted to a String", false],
+      ["It is rounded to zero", false],
+    ],
+  },
+  {
+    topic: "Type Casting",
+    difficulty: "medium",
+    question: "What is the value of int code = 'A';?",
+    explanation: "The Unicode value of uppercase A is 65, so assigning it to int produces 65.",
+    options: [
+      ["1", false],
+      ["26", false],
+      ["65", true],
+      ["97", false],
+    ],
+  },
+  {
+    topic: "Type Casting",
+    difficulty: "medium",
+    question: "What character does char letter = (char) 66; store?",
+    explanation: "The Unicode value 66 represents the uppercase character B.",
+    options: [
+      ["A", false],
+      ["B", true],
+      ["C", false],
+      ["66", false],
+    ],
+  },
+  {
     topic: "Format Specifiers and Escape Sequences",
     difficulty: "easy",
     question: "Which format specifier is commonly used for a decimal integer?",
@@ -415,7 +463,7 @@ else {
 
 const { data: existingQuizQuestions, error: quizQuestionsError } = await supabase
   .from("quiz_questions")
-  .select("question_id")
+  .select("question_id, display_order")
   .eq("quiz_id", quizId);
 
 if (quizQuestionsError) throw quizQuestionsError;
@@ -423,11 +471,13 @@ if (quizQuestionsError) throw quizQuestionsError;
 const linkedQuestionIds = new Set(
   existingQuizQuestions.map(({ question_id }) => question_id),
 );
+const nextDisplayOrder =
+  Math.max(0, ...existingQuizQuestions.map(({ display_order }) => display_order)) + 1;
 const missingQuizQuestions = questionIds
   .map((questionId, index) => ({
     quiz_id: quizId,
     question_id: questionId,
-    display_order: index + 1,
+    display_order: nextDisplayOrder + index,
     marks: 1,
   }))
   .filter(({ question_id }) => !linkedQuestionIds.has(question_id));
